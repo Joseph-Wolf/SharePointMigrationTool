@@ -1,4 +1,5 @@
-﻿using Microsoft.SharePoint.Client;
+﻿using Interfaces;
+using Microsoft.SharePoint.Client;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -8,7 +9,7 @@ using System.Threading.Tasks;
 
 namespace SharePoint2010Interface
 {
-    public class SharePoint2010
+    public class SharePoint2010 : ISource
     {
         #region Properties
         private ICredentials credentials { get; set; }
@@ -29,7 +30,7 @@ namespace SharePoint2010Interface
             }
         }
         #region MethodsNeededToUseThisAsASource
-        public IEnumerable<SharePoint2010List> GetLists()
+        public IEnumerable<SourceList> GetLists()
         {
             return PrivateGetLists();
         }
@@ -217,14 +218,14 @@ namespace SharePoint2010Interface
             }
             return item;
         }
-        private IEnumerable<SharePoint2010List> PrivateGetLists()
+        private IEnumerable<SourceList> PrivateGetLists()
         {
             ClientContext c;
             using (c = context)
             {
                 c.Load(c.Web, x => x.Lists.Include(y => y.Title, y => y.BaseTemplate, y => y.ItemCount));
                 c.ExecuteQuery();
-                return c.Web.Lists.Select(x => new SharePoint2010List() { Title = x.Title, Type = x.BaseTemplate, ItemCount = x.ItemCount });
+                return c.Web.Lists.Select(x => new SourceList() { Title = x.Title, Type = x.BaseTemplate, ItemCount = x.ItemCount });
             }
         }
         #endregion

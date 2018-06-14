@@ -1,4 +1,5 @@
-﻿using Microsoft.SharePoint.Client;
+﻿using Interfaces;
+using Microsoft.SharePoint.Client;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -8,7 +9,7 @@ using System.Threading.Tasks;
 
 namespace SharePointOnlineInterface
 {
-    public class SharePointOnline
+    public class SharePointOnline : IDestination
     {
         #region Properties
         private CamlQuery getItemsToDelete { get; } = new CamlQuery()
@@ -32,7 +33,7 @@ namespace SharePointOnlineInterface
         #endregion
         #endregion
         #region Public
-        public SharePointOnline(string url, string username, string password, Func<string, int, IDictionary<string, string>> GetSourceItemAttributes, Func<string, int, Task<IDictionary<string, Stream>>> GetSourceItemAttachments, Func<string, Task<IEnumerable<string>>> GetSourceFolderNames, Func<string, Task<IEnumerable<string>>> GetSourceFileNames, Func<string, Task<Stream>> GetSourceFileStream)
+        public SharePointOnline(string url, string username, string password)
         {
             SecureString pass = new SecureString();
             int characterIndex;
@@ -43,13 +44,16 @@ namespace SharePointOnlineInterface
 
             this.credentials = new SharePointOnlineCredentials(username, pass);
             this.url = url;
+        }
+        #region MethodsNeededToUseThisAsADestination
+        public void InjectDependencies(Func<string, int, IDictionary<string, string>> GetSourceItemAttributes, Func<string, int, Task<IDictionary<string, Stream>>> GetSourceItemAttachments, Func<string, Task<IEnumerable<string>>> GetSourceFolderNames, Func<string, Task<IEnumerable<string>>> GetSourceFileNames, Func<string, Task<Stream>> GetSourceFileStream)
+        {
             this.GetSourceItemAttributes = GetSourceItemAttributes;
             this.GetSourceItemAttachments = GetSourceItemAttachments;
             this.GetSourceFolderNames = GetSourceFolderNames;
             this.GetSourceFileNames = GetSourceFileNames;
             this.GetSourceFileStream = GetSourceFileStream;
         }
-        #region MethodsNeededToUseThisAsADestination
         public async Task AddList(string title, int type, int itemCount)
         {
             List list = await GetOrCreateList(title, type);

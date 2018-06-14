@@ -38,6 +38,10 @@
     <Compile Include="Program.cs" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\Interfaces\Interfaces.csproj">
+      <Project>{2616cc1b-f4fe-46e3-b588-21fb1fc5fee9}</Project>
+      <Name>Interfaces</Name>
+    </ProjectReference>
     <ProjectReference Include="..\SharePoint2010Interface\SharePoint2010Interface.csproj">
       <Project>{80f77175-1edf-4b74-8b09-61e7b894c905}</Project>
       <Name>SharePoint2010Interface</Name>
