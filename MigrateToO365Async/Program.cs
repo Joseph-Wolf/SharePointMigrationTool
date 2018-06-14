@@ -16,7 +16,7 @@ namespace MigrateToO365Async
             var destination = new SharePointOnline(args[1], args[2], args[3], source.GetItemAttributes, source.GetItemAttachments, source.GetFolderNames, source.GetFileNames, source.GetFileStream);
 
             var sourceLists = source.GetLists();
-            //sourceLists = sourceLists.Where(x => x.Title == "AnnuityMet"); //Debugging
+            sourceLists = sourceLists.Where(x => x.Title == "AnnuityMet"); //Debugging
             foreach (var list in sourceLists)
             {
                 tasks.Add(destination.AddList(list.Title, list.Type, list.ItemCount));

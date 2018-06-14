@@ -10,37 +10,28 @@ namespace SharePoint2010Interface
 {
     public class SharePoint2010
     {
+        #region Properties
         private ICredentials credentials { get; set; }
         private string url { get; set; }
         private string[] itemAttributes { get; } = new string[] { "Title", "Modified", "Created" };
-        private ClientContext context
-        {
-            get
-            {
-                if (string.IsNullOrEmpty(url) || credentials == default(ICredentials))
-                {
-                    return null;
-                }
-                return new ClientContext(url)
-                {
-                    Credentials = credentials
-                };
-            }
-        }
-        public SharePoint2010(string url)
+        #endregion
+        #region Public
+        public SharePoint2010(string url, string username = null, string password = null)
         {
             this.url = url;
-            this.credentials = CredentialCache.DefaultCredentials;
+            if(username == null || password == null)
+            {
+                this.credentials = CredentialCache.DefaultCredentials;
+            }
+            else
+            {
+                this.credentials = new NetworkCredential(username, password);
+            }
         }
+        #region MethodsNeededToUseThisAsASource
         public IEnumerable<SharePoint2010List> GetLists()
         {
-            ClientContext c;
-            using (c = context)
-            {
-                c.Load(c.Web, x => x.Lists.Include(y => y.Title, y => y.BaseTemplate, y => y.ItemCount));
-                c.ExecuteQuery();
-                return c.Web.Lists.Select(x => new SharePoint2010List() { Title = x.Title, Type = x.BaseTemplate, ItemCount = x.ItemCount });
-            }
+            return PrivateGetLists();
         }
         public IDictionary<string, string> GetItemAttributes(string listTitle, int itemId)
         {
@@ -85,6 +76,33 @@ namespace SharePoint2010Interface
             }
             return output;
         }
+        #endregion
+        #endregion
+        #region Helpers
+        private ClientContext context
+        {
+            get
+            {
+                if (string.IsNullOrEmpty(url) || credentials == default(ICredentials))
+                {
+                    return null;
+                }
+                return new ClientContext(url)
+                {
+                    Credentials = credentials
+                };
+            }
+        }
+        private string CleanUrl(string url)
+        {
+            ClientContext c;
+            using (c = context)
+            {
+                c.Load(c.Web, x => x.ServerRelativeUrl);
+                c.ExecuteQuery();
+                return c.Web.ServerRelativeUrl + url;
+            }
+        }
         private IEnumerable<string> PrivateGetFolderNames(string url)
         {
             ClientContext c;
@@ -107,16 +125,6 @@ namespace SharePoint2010Interface
                 }
             }
             return new List<string>();
-        }
-        private string CleanUrl(string url)
-        {
-            ClientContext c;
-            using(c = context)
-            {
-                c.Load(c.Web, x => x.ServerRelativeUrl);
-                c.ExecuteQuery();
-                return c.Web.ServerRelativeUrl + url;
-            }
         }
         private IEnumerable<string> PrivateGetFileNames(string url)
         {
@@ -209,5 +217,16 @@ namespace SharePoint2010Interface
             }
             return item;
         }
+        private IEnumerable<SharePoint2010List> PrivateGetLists()
+        {
+            ClientContext c;
+            using (c = context)
+            {
+                c.Load(c.Web, x => x.Lists.Include(y => y.Title, y => y.BaseTemplate, y => y.ItemCount));
+                c.ExecuteQuery();
+                return c.Web.Lists.Select(x => new SharePoint2010List() { Title = x.Title, Type = x.BaseTemplate, ItemCount = x.ItemCount });
+            }
+        }
+        #endregion
     }
 }

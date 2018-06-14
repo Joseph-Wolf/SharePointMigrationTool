@@ -1,6 +1,4 @@
-﻿
-
-using Microsoft.SharePoint.Client;
+﻿using Microsoft.SharePoint.Client;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -12,6 +10,7 @@ namespace SharePointOnlineInterface
 {
     public class SharePointOnline
     {
+        #region Properties
         private CamlQuery getItemsToDelete { get; } = new CamlQuery()
         {
             ViewXml = "<View><RowLimit>1000</RowLimit></View>"
@@ -24,25 +23,15 @@ namespace SharePointOnlineInterface
         private string[] itemAttributes { get; } = new string[] { "Title", "Modified", "Created" };
         private SharePointOnlineCredentials credentials { get; set; }
         private string url { get; set; }
+        #region Dependencies
         private Func<string, int, IDictionary<string, string>> GetSourceItemAttributes { get; set; }
         private Func<string, int, Task<IDictionary<string, Stream>>> GetSourceItemAttachments { get; set; }
         private Func<string, Task<IEnumerable<string>>> GetSourceFolderNames { get; set; }
         private Func<string, Task<IEnumerable<string>>> GetSourceFileNames { get; set; }
         private Func<string, Task<Stream>> GetSourceFileStream { get; set; }
-        private ClientContext context
-        {
-            get
-            {
-                if (string.IsNullOrEmpty(url) || credentials == default(SharePointOnlineCredentials))
-                {
-                    return null;
-                }
-                return new ClientContext(url)
-                {
-                    Credentials = credentials
-                };
-            }
-        }
+        #endregion
+        #endregion
+        #region Public
         public SharePointOnline(string url, string username, string password, Func<string, int, IDictionary<string, string>> GetSourceItemAttributes, Func<string, int, Task<IDictionary<string, Stream>>> GetSourceItemAttachments, Func<string, Task<IEnumerable<string>>> GetSourceFolderNames, Func<string, Task<IEnumerable<string>>> GetSourceFileNames, Func<string, Task<Stream>> GetSourceFileStream)
         {
             SecureString pass = new SecureString();
@@ -60,6 +49,7 @@ namespace SharePointOnlineInterface
             this.GetSourceFileNames = GetSourceFileNames;
             this.GetSourceFileStream = GetSourceFileStream;
         }
+        #region MethodsNeededToUseThisAsADestination
         public async Task AddList(string title, int type, int itemCount)
         {
             List list = await GetOrCreateList(title, type);
@@ -78,6 +68,33 @@ namespace SharePointOnlineInterface
                         Console.WriteLine(string.Format("Did not plan for list type {0}", listType));
                         break;
                 }
+            }
+        }
+        #endregion
+        #endregion
+        #region Helpers
+        private ClientContext context
+        {
+            get
+            {
+                if (string.IsNullOrEmpty(url) || credentials == default(SharePointOnlineCredentials))
+                {
+                    return null;
+                }
+                return new ClientContext(url)
+                {
+                    Credentials = credentials
+                };
+            }
+        }
+        private async Task<string> CleanUrl(string url)
+        {
+            ClientContext c;
+            using (c = context)
+            {
+                c.Load(c.Web, x => x.ServerRelativeUrl);
+                await c.ExecuteQueryAsync();
+                return c.Web.ServerRelativeUrl + url;
             }
         }
         private async Task<List> GetOrCreateList(string title, int type)
@@ -141,6 +158,7 @@ namespace SharePointOnlineInterface
             }
             return 0;
         }
+        #region GenericList
         private async Task InitGenericList(List list, int itemCount)
         {
 #if DEBUG
@@ -193,6 +211,8 @@ namespace SharePointOnlineInterface
                 }
             }
         }
+        #endregion
+        #region DocumentLibrary
         private async Task InitDocumentLibrary(List list)
         {
 #if DEBUG
@@ -241,15 +261,7 @@ namespace SharePointOnlineInterface
                 }
             }
         }
-        private async Task<string> CleanUrl(string url)
-        {
-            ClientContext c;
-            using (c = context)
-            {
-                c.Load(c.Web, x => x.ServerRelativeUrl);
-                await c.ExecuteQueryAsync();
-                return c.Web.ServerRelativeUrl + url;
-            }
-        }
+        #endregion
+        #endregion
     }
 }
