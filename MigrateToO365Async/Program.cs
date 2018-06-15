@@ -12,7 +12,6 @@ namespace MigrateToO365Async
     {
         static void Main(string[] args)
         {
-            int argumentIndex;
             string sourceUrl = null;
             string sourceUsername = null;
             string sourcePassword = null;
@@ -28,13 +27,13 @@ namespace MigrateToO365Async
             char commandSplitCharacter = '=';
 
             //Parse argument array into variables
-            for(argumentIndex = 0; argumentIndex < args.Length; argumentIndex++)
+            foreach(var argument in args)
             {
-                if(args[argumentIndex].IndexOf(commandSplitCharacter) >= 0) //Check that argument has expected splitting characters
+                if (argument.IndexOf(commandSplitCharacter) >= 0) //Check that argument has expected splitting characters
                 {
-                    key = args[argumentIndex].Split(commandSplitCharacter).First();
-                    value = args[argumentIndex].Split(commandSplitCharacter).Last();
-                    switch(key.ToUpper())
+                    key = argument.Split(commandSplitCharacter).First();
+                    value = argument.Split(commandSplitCharacter).Last();
+                    switch (key.ToUpper())
                     {
                         case "SOURCEURL":
                             sourceUrl = value;

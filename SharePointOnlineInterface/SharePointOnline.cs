@@ -44,10 +44,9 @@ namespace SharePointOnlineInterface
 
             //Convert the password into a secure string
             SecureString pass = new SecureString();
-            int characterIndex;
-            for (characterIndex = 0; characterIndex < password.Length; characterIndex++)
+            foreach(var character in password)
             {
-                pass.AppendChar(password[characterIndex]);
+                pass.AppendChar(character);
             }
             
             this.credentials = new SharePointOnlineCredentials(username, pass); //Create credentials to be used
@@ -152,9 +151,9 @@ namespace SharePointOnlineInterface
                 list.Context.Load(items, x => x.ListItemCollectionPosition); //Used to determine if it has all of the items or not
                 list.Context.Load(items, x => x.Include(y => y.Id)); //Get the list Ids
                 await list.Context.ExecuteQueryAsync();
-                for (itemIndex = 0; itemIndex < items.Count; itemIndex++) //Iterate the items
+                foreach(var item in items) //Iterate the items
                 {
-                    items[itemIndex].DeleteObject(); //Deleat items one at a time
+                    item.DeleteObject(); //Deleat items one at a time
                 }
             }
             while (items.ListItemCollectionPosition != null); //Check if that was the last group of items
@@ -183,8 +182,6 @@ namespace SharePointOnlineInterface
             IDictionary<string, string> attributes;
             IDictionary<string, Stream> attachments;
             int itemIndex;
-            int attributeIndex;
-            int attachmentIndex;
             int currentCount = await GetLastItemId(list);
 
             //Add items
@@ -198,21 +195,21 @@ namespace SharePointOnlineInterface
 
                     //Update properties
                     attributes = GetSourceItemAttributes(list.Title, itemIndex); //Get properties from source
-                    for (attributeIndex = 0; attributeIndex < itemAttributes.Length; attributeIndex++)
+                    foreach(var attribute in itemAttributes)
                     {
-                        item[itemAttributes[attributeIndex]] = attributes[itemAttributes[attributeIndex]];
+                        item[attribute] = attributes[attribute];
                     }
 
                     item.Update(); //Trigger an item update so it gets inserted
 
                     //Update attachments
                     attachments = await GetSourceItemAttachments(list.Title, itemIndex);
-                    for (attachmentIndex = 0; attachmentIndex < attachments.Count(); attachmentIndex++)
+                    foreach(var attachment in attachments)
                     {
                         item.AttachmentFiles.Add(new AttachmentCreationInformation() //Queue a query to write the stream as an attachment
                         {
-                            FileName = attachments.ElementAt(attachmentIndex).Key, //Set attachment name
-                            ContentStream = attachments.ElementAt(attachmentIndex).Value //Set attachment content
+                            FileName = attachment.Key, //Set attachment name
+                            ContentStream = attachment.Value //Set attachment content
                         });
                     }
 
@@ -248,8 +245,6 @@ namespace SharePointOnlineInterface
         {
             ClientContext c;
             Folder folder;
-            int fileIndex;
-            int folderIndex;
             Stream fileStream;
             string sourceFileRelativeUrl;
             IEnumerable<string> folderNames = await GetSourceFolderNames(url);
@@ -257,43 +252,37 @@ namespace SharePointOnlineInterface
             using (c = context)
             {
                 folder = c.Web.GetFolderByServerRelativeUrl(await CleanUrl(url)); //Get the folder
+                c.Load(folder, x => x.Files.Include(y => y.Name), x => x.Folders.Include(y => y.Name)); //Get folder and file names to avoid inserting duplicates
+                await c.ExecuteQueryAsync();
                 //Iterate the files
-                for (fileIndex = 0; fileIndex < fileNames.Count(); fileIndex++)
+                foreach(var fileName in fileNames)
                 {
-                    sourceFileRelativeUrl = Path.Combine(url, fileNames.ElementAt(fileIndex));
-
-                    using (fileStream = await GetSourceFileStream(sourceFileRelativeUrl))
+                    if (!folder.Files.Any(x => x.Name == fileName)) //Make sure the file doesn't exist already
                     {
-                        try
+                        sourceFileRelativeUrl = Path.Combine(url, fileName);
+
+                        using (fileStream = await GetSourceFileStream(sourceFileRelativeUrl))
                         {
                             //Add file
                             folder.Files.Add(new FileCreationInformation()
                             {
-                                Url = fileNames.ElementAt(fileIndex), //Set filename
+                                Url = fileName, //Set filename
                                 ContentStream = fileStream, //Get and set file stream
                                 Overwrite = false //Do not overwrite files to save time
                             });
                             await c.ExecuteQueryAsync();
                         }
-                        catch
-                        {
-                            //Do nothing because the file already exists
-                        }
                     }
                 }
                 //Iterate the folders
-                for (folderIndex = 0; folderIndex < folderNames.Count(); folderIndex++)
+                foreach(var folderName in folderNames)
                 {
-                    try
+                    if(!folder.Folders.Any(x => x.Name == folderName))
                     {
-                        folder.AddSubFolder(folderNames.ElementAt(folderIndex)); //Add folder
+                        folder.AddSubFolder(folderName); //Add folder
                         await c.ExecuteQueryAsync();
                     }
-                    catch
-                    {
-                        //Do nothing because the folder already exists
-                    }
-                    await PopulateFolder(Path.Combine(url, folderNames.ElementAt(folderIndex))); //Populate newly added folder
+                    await PopulateFolder(Path.Combine(url, folderName)); //Populate the folder
                 }
             }
         }

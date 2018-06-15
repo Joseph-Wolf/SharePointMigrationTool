@@ -41,15 +41,14 @@ namespace SharePoint2010Interface
         public IDictionary<string, string> GetItemAttributes(string listTitle, int itemId)
         { //Returns item attributes for given properties
             ListItem item;
-            int attributeIndex;
             Dictionary<string, string> output = new Dictionary<string, string>();
             item = GetItem(listTitle, itemId); //Get the item using the list title and id
             if (item != default(ListItem))
             {
                 //Format properties to return
-                for (attributeIndex = 0; attributeIndex < itemAttributes.Length; attributeIndex++)
+                foreach(var attributeName in itemAttributes)
                 {
-                    output.Add(itemAttributes[attributeIndex], item[itemAttributes[attributeIndex]].ToString());
+                    output.Add(attributeName, item[attributeName].ToString());
                 }
             }
             return output; //return any found properties
@@ -68,15 +67,14 @@ namespace SharePoint2010Interface
         }
         public async Task<IDictionary<string, Stream>> GetItemAttachments(string listTitle, int itemId)
         { //Returns a dictionary of list item attachments
-            int attachmentIndex;
             IDictionary<string, Stream> output = new Dictionary<string, Stream>();
             ListItem item = GetItem(listTitle, itemId); //Get the item
             if (item["Attachments"] as bool? == true) //Make sure the item has attachments
             {
                 FileCollection attachmentCollection = GetAttachmentCollection(listTitle, itemId); //Get the collection of attachments
-                for (attachmentIndex = 0; attachmentIndex < attachmentCollection.Count; attachmentIndex++)
-                { //Iterate the attachments
-                    output.Add(attachmentCollection[attachmentIndex].Name, await PrivateGetFileStream(attachmentCollection[attachmentIndex].ServerRelativeUrl));
+                foreach(var attachment in attachmentCollection)
+                {//Iterate the attachments
+                    output.Add(attachment.Name, await PrivateGetFileStream(attachment.ServerRelativeUrl));
                 }
             }
             return output; //Return fathered attachments
