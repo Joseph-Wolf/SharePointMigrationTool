@@ -190,6 +190,7 @@ namespace SharePointOnlineInterface
             //Add items
             for (itemIndex = currentCount + 1; itemIndex < itemCount; itemIndex++)
             {
+                //TODO: how does this handle a deleted item?
                 try
                 {
                     //Add blank item
@@ -263,21 +264,35 @@ namespace SharePointOnlineInterface
 
                     using (fileStream = await GetSourceFileStream(sourceFileRelativeUrl))
                     {
-                        //Add file
-                        folder.Files.Add(new FileCreationInformation()
+                        try
                         {
-                            Url = fileNames.ElementAt(fileIndex), //Set filename
-                            ContentStream = fileStream, //Get and set file stream
-                            Overwrite = false //Do not overwrite files to save time
-                        });
-                        await c.ExecuteQueryAsync();
+                            //Add file
+                            folder.Files.Add(new FileCreationInformation()
+                            {
+                                Url = fileNames.ElementAt(fileIndex), //Set filename
+                                ContentStream = fileStream, //Get and set file stream
+                                Overwrite = false //Do not overwrite files to save time
+                            });
+                            await c.ExecuteQueryAsync();
+                        }
+                        catch
+                        {
+                            //Do nothing because the file already exists
+                        }
                     }
                 }
                 //Iterate the folders
                 for (folderIndex = 0; folderIndex < folderNames.Count(); folderIndex++)
                 {
-                    folder.AddSubFolder(folderNames.ElementAt(folderIndex)); //Add folder
-                    await c.ExecuteQueryAsync();
+                    try
+                    {
+                        folder.AddSubFolder(folderNames.ElementAt(folderIndex)); //Add folder
+                        await c.ExecuteQueryAsync();
+                    }
+                    catch
+                    {
+                        //Do nothing because the folder already exists
+                    }
                     await PopulateFolder(Path.Combine(url, folderNames.ElementAt(folderIndex))); //Populate newly added folder
                 }
             }
