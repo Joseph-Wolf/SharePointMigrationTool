@@ -35,19 +35,27 @@ namespace SharePointOnlineInterface
         #region Public
         public SharePointOnline(string url, string username, string password)
         {
+            if(username == null || password == null) //username and passwords are required for this class
+            {
+                throw new ArgumentException(message: "Arguments 'username' and 'password' are required for SharePoint Online URLs");
+            }
+
+            this.url = url; //Assign the passed URL to a private variable
+
+            //Convert the password into a secure string
             SecureString pass = new SecureString();
             int characterIndex;
             for (characterIndex = 0; characterIndex < password.Length; characterIndex++)
             {
                 pass.AppendChar(password[characterIndex]);
             }
-
-            this.credentials = new SharePointOnlineCredentials(username, pass);
-            this.url = url;
+            
+            this.credentials = new SharePointOnlineCredentials(username, pass); //Create credentials to be used
         }
         #region MethodsNeededToUseThisAsADestination
         public void InjectDependencies(Func<string, int, IDictionary<string, string>> GetSourceItemAttributes, Func<string, int, Task<IDictionary<string, Stream>>> GetSourceItemAttachments, Func<string, Task<IEnumerable<string>>> GetSourceFolderNames, Func<string, Task<IEnumerable<string>>> GetSourceFileNames, Func<string, Task<Stream>> GetSourceFileStream)
         {
+            //Save the injected methods as private ones to be used later
             this.GetSourceItemAttributes = GetSourceItemAttributes;
             this.GetSourceItemAttachments = GetSourceItemAttachments;
             this.GetSourceFolderNames = GetSourceFolderNames;
@@ -56,11 +64,11 @@ namespace SharePointOnlineInterface
         }
         public async Task AddList(string title, int type, int itemCount)
         {
-            List list = await GetOrCreateList(title, type);
+            List list = await GetOrCreateList(title, type); //Returns the expected list
 
-            if (Enum.TryParse(type.ToString(), out ListTemplateType listType))
+            if (Enum.TryParse(type.ToString(), out ListTemplateType listType)) //parse the list type into the expected types
             {
-                switch (listType)
+                switch (listType) //Execute different methods depending on the type
                 {
                     case ListTemplateType.GenericList:
                         await InitGenericList(list, itemCount);
@@ -92,7 +100,7 @@ namespace SharePointOnlineInterface
             }
         }
         private async Task<string> CleanUrl(string url)
-        {
+        { //Returns a URL with the relative URL appended to it
             ClientContext c;
             using (c = context)
             {
@@ -102,30 +110,32 @@ namespace SharePointOnlineInterface
             }
         }
         private async Task<List> GetOrCreateList(string title, int type)
-        {
+        { //Creates a list if it does not already exist and returns it
             List output;
             ClientContext c;
             using (c = context)
             {
+                //Look for any list with that title already
                 c.Load(c.Web.Lists, x => x.Where(y => y.Title == title));
                 await c.ExecuteQueryAsync();
 
-                if (c.Web.Lists.Any()) //Get the existing list
+                if (c.Web.Lists.Any())
                 {
 #if DEBUG
                     Console.WriteLine(string.Format("Existing List:'{0}'", title));
 #endif
-                    output = c.Web.Lists.First();
+                    output = c.Web.Lists.First(); //Get the existing list
                 }
-                else //Add new list
+                else
                 {
 #if DEBUG
                     Console.WriteLine(string.Format("Adding List:'{0}'", title));
 #endif
+                    //Add new list
                     output = c.Web.Lists.Add(new ListCreationInformation()
                     {
-                        Title = title,
-                        TemplateType = type
+                        Title = title, //New list title
+                        TemplateType = type //New list type
                     });
                     await c.ExecuteQueryAsync();
                 }
@@ -133,38 +143,38 @@ namespace SharePointOnlineInterface
             }
         }
         private async Task DeleteList(List list)
-        {
+        { //This is used to delete large lists that can not be deleted otherwise. It removes the items in chunks before attempting to remote the list
             ListItemCollection items;
             int itemIndex;
             do
             {
-                items = list.GetItems(getItemsToDelete);
-                list.Context.Load(items, x => x.ListItemCollectionPosition);
-                list.Context.Load(items, x => x.Include(y => y.Id));
-                await list.Context.ExecuteQueryAsync(); //Execute query to get the last source item Id
-                for (itemIndex = 0; itemIndex < items.Count; itemIndex++)
+                items = list.GetItems(getItemsToDelete); //Get the next batch of items
+                list.Context.Load(items, x => x.ListItemCollectionPosition); //Used to determine if it has all of the items or not
+                list.Context.Load(items, x => x.Include(y => y.Id)); //Get the list Ids
+                await list.Context.ExecuteQueryAsync();
+                for (itemIndex = 0; itemIndex < items.Count; itemIndex++) //Iterate the items
                 {
-                    items[itemIndex].DeleteObject();
+                    items[itemIndex].DeleteObject(); //Deleat items one at a time
                 }
             }
-            while (items.ListItemCollectionPosition != null);
+            while (items.ListItemCollectionPosition != null); //Check if that was the last group of items
 
         }
         private async Task<int> GetLastItemId(List list)
-        {
+        { //This is used to get the last item id from a list
             ListItemCollection items;
-            items = list.GetItems(getLastItemIdQuery); //Get the last Source Item added
-            list.Context.Load(items, x => x.Include(y => y.Id)); //Queue a query to get the last source Item Id
-            await list.Context.ExecuteQueryAsync(); //Execute query to get the last source item Id
+            items = list.GetItems(getLastItemIdQuery); //Get the last Item added
+            list.Context.Load(items, x => x.Include(y => y.Id)); //Queue a query to get the last Item Id
+            await list.Context.ExecuteQueryAsync(); //Execute query to get the last item Id
             if (items.Any())
             {
-                return items.First().Id;
+                return items.First().Id; //return the id
             }
-            return 0;
+            return 0; //return 0 because there are no items
         }
         #region GenericList
         private async Task InitGenericList(List list, int itemCount)
-        {
+        { //Used to populate Generic lists
 #if DEBUG
             Console.WriteLine(string.Format("InitGenericList:'{0}'", list.Title));
 #endif
@@ -207,10 +217,10 @@ namespace SharePointOnlineInterface
 
                     item.Update(); //Trigger an item update so attachments get inserted
                     await list.Context.ExecuteQueryAsync(); //execute queued queries
+                    attachments.Select(x => { x.Value.Dispose(); return x; }); //Dispose sreams
                 }
                 catch (Exception ex)
                 {
-                    Console.Write(ex);
                     throw ex;
                 }
             }
@@ -218,20 +228,19 @@ namespace SharePointOnlineInterface
         #endregion
         #region DocumentLibrary
         private async Task InitDocumentLibrary(List list)
-        {
+        { //Used to populate Document libraries
 #if DEBUG
             Console.WriteLine(string.Format("InitDocumentLibrary:'{0}'", list.Title));
 #endif
+            //Get the root folder to the list to start
             Folder folder = list.RootFolder;
-            //Get server pat
             list.Context.Load(list, x => x.ParentWebUrl);
             list.Context.Load(folder, x => x.ServerRelativeUrl);
             await list.Context.ExecuteQueryAsync();
 
+            //Convert the path into a relative one
             int index = folder.ServerRelativeUrl.IndexOf(list.ParentWebUrl);
-            string cleanPath = (index < 0)
-                ? folder.ServerRelativeUrl
-                : folder.ServerRelativeUrl.Remove(index, list.ParentWebUrl.Length);
+            string cleanPath = (index < 0) ? folder.ServerRelativeUrl : folder.ServerRelativeUrl.Remove(index, list.ParentWebUrl.Length);
             await PopulateFolder(cleanPath);
         }
         private async Task PopulateFolder(string url)
@@ -240,27 +249,35 @@ namespace SharePointOnlineInterface
             Folder folder;
             int fileIndex;
             int folderIndex;
+            Stream fileStream;
             string sourceFileRelativeUrl;
             IEnumerable<string> folderNames = await GetSourceFolderNames(url);
             IEnumerable<string> fileNames = await GetSourceFileNames(url);
             using (c = context)
             {
-                folder = c.Web.GetFolderByServerRelativeUrl(await CleanUrl(url));
+                folder = c.Web.GetFolderByServerRelativeUrl(await CleanUrl(url)); //Get the folder
+                //Iterate the files
                 for (fileIndex = 0; fileIndex < fileNames.Count(); fileIndex++)
                 {
                     sourceFileRelativeUrl = Path.Combine(url, fileNames.ElementAt(fileIndex));
-                    folder.Files.Add(new FileCreationInformation()
+
+                    using (fileStream = await GetSourceFileStream(sourceFileRelativeUrl))
                     {
-                        Url = fileNames.ElementAt(fileIndex),
-                        ContentStream = await GetSourceFileStream(sourceFileRelativeUrl),
-                        Overwrite = false
-                    });
-                    await c.ExecuteQueryAsync(); //Add file
+                        //Add file
+                        folder.Files.Add(new FileCreationInformation()
+                        {
+                            Url = fileNames.ElementAt(fileIndex), //Set filename
+                            ContentStream = fileStream, //Get and set file stream
+                            Overwrite = false //Do not overwrite files to save time
+                        });
+                        await c.ExecuteQueryAsync();
+                    }
                 }
+                //Iterate the folders
                 for (folderIndex = 0; folderIndex < folderNames.Count(); folderIndex++)
                 {
-                    folder.AddSubFolder(folderNames.ElementAt(folderIndex));
-                    await c.ExecuteQueryAsync(); //Add folder
+                    folder.AddSubFolder(folderNames.ElementAt(folderIndex)); //Add folder
+                    await c.ExecuteQueryAsync();
                     await PopulateFolder(Path.Combine(url, folderNames.ElementAt(folderIndex))); //Populate newly added folder
                 }
             }
