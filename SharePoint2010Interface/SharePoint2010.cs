@@ -121,7 +121,7 @@ namespace SharePoint2010Interface
                     c.ExecuteQuery();
                     return folder.Folders.Select(x => x.Name); //Return the folder names
                 }
-                catch (ArgumentException ex)
+                catch (Exception ex)
                 {
                     if (ex.Message != "Item does not exist. It may have been deleted by another user.")
                     {
@@ -145,7 +145,7 @@ namespace SharePoint2010Interface
                     c.ExecuteQuery();
                     return folder.Files.Select(x => x.Name); //Return the files names
                 }
-                catch (ArgumentException ex)
+                catch (Exception ex)
                 {
                     if (ex.Message != "Item does not exist. It may have been deleted by another user.")
                     {
@@ -168,7 +168,7 @@ namespace SharePoint2010Interface
                     await file.Stream.CopyToAsync(output); //Copies the file to a memory stream
                     output.Seek(0, SeekOrigin.Begin); //Resets the stream so it is ready to be used
                 }
-                catch (ArgumentException ex)
+                catch (Exception ex)
                 {
                     if (ex.Message != "Item does not exist. It may have been deleted by another user.")
                     {
@@ -191,7 +191,7 @@ namespace SharePoint2010Interface
                     c.ExecuteQuery(); //Execute queued queries
                 }
             }
-            catch (ArgumentException ex)
+            catch (Exception ex)
             {
                 if (ex.Message != "Item does not exist. It may have been deleted by another user.")
                 {
@@ -213,7 +213,7 @@ namespace SharePoint2010Interface
                     c.ExecuteQuery();
                 }
             }
-            catch (ArgumentException ex)
+            catch (Exception ex)
             {
                 if (ex.Message != "Item does not exist. It may have been deleted by another user.")
                 {
