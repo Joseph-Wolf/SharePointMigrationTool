@@ -11,6 +11,6 @@ namespace Interfaces
         Task<IEnumerable<string>> GetFolderNames(string url);
         Task<IEnumerable<string>> GetFileNames(string url);
         Task<Stream> GetFileStream(string url);
-        Task<IDictionary<string, Stream>> GetItemAttachments(string listTitle, int itemId);
+        Task<IEnumerable<string>> GetItemAttachmentPaths(string listTitle, int itemId);
     }
 }

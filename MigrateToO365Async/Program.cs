@@ -95,10 +95,11 @@ namespace MigrateToO365Async
                 return;
             }
             //Inject required methods from the source to the destination class
-            destination.InjectDependencies(source.GetItemAttributes, source.GetItemAttachments, source.GetFolderNames, source.GetFileNames, source.GetFileStream);
+            destination.InjectDependencies(source.GetItemAttributes, source.GetItemAttachmentPaths, source.GetFolderNames, source.GetFileNames, source.GetFileStream);
             //Get lists present in the source
             sourceLists = source.GetLists();
             //Iterate and add lists
+            sourceLists = sourceLists.Where(x => x.Title == "ActivityAttachment"); //Debugging
             foreach (var list in sourceLists)
             {
                 tasks.Add(destination.AddList(list.Title, list.Type, list.ItemCount));

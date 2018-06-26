@@ -65,19 +65,15 @@ namespace SharePoint2010Interface
         { //Returns a filestream of a given file URL
             return await PrivateGetFileStream(CleanUrl(url));
         }
-        public async Task<IDictionary<string, Stream>> GetItemAttachments(string listTitle, int itemId)
+        public async Task<IEnumerable<string>> GetItemAttachmentPaths(string listTitle, int itemId)
         { //Returns a dictionary of list item attachments
-            IDictionary<string, Stream> output = new Dictionary<string, Stream>();
             ListItem item = GetItem(listTitle, itemId); //Get the item
             if (item["Attachments"] as bool? == true) //Make sure the item has attachments
             {
                 FileCollection attachmentCollection = GetAttachmentCollection(listTitle, itemId); //Get the collection of attachments
-                foreach(var attachment in attachmentCollection)
-                {//Iterate the attachments
-                    output.Add(attachment.Name, await PrivateGetFileStream(attachment.ServerRelativeUrl));
-                }
+                return attachmentCollection.Select(x => UncleanUrl(x.ServerRelativeUrl));
             }
-            return output; //Return fathered attachments
+            return new List<string>();
         }
         #endregion
         #endregion
@@ -105,6 +101,17 @@ namespace SharePoint2010Interface
                 c.ExecuteQuery();
                 return c.Web.ServerRelativeUrl + url;
             }
+        }
+        private string UncleanUrl(string url)
+        { //Converts the server URL back into a relative url
+            ClientContext c;
+            using (c = context)
+            {
+                c.Load(c.Web, x => x.ServerRelativeUrl);
+                c.ExecuteQuery();
+                return url.Replace(c.Web.ServerRelativeUrl, string.Empty);
+            }
+
         }
         private IEnumerable<string> PrivateGetFolderNames(string url)
         { //returns a list of folder names under a given URL

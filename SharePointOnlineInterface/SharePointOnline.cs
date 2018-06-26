@@ -26,7 +26,7 @@ namespace SharePointOnlineInterface
         private string url { get; set; }
         #region Dependencies
         private Func<string, int, IDictionary<string, string>> GetSourceItemAttributes { get; set; }
-        private Func<string, int, Task<IDictionary<string, Stream>>> GetSourceItemAttachments { get; set; }
+        private Func<string, int, Task<IEnumerable<string>>> GetSourceItemAttachmentPaths { get; set; }
         private Func<string, Task<IEnumerable<string>>> GetSourceFolderNames { get; set; }
         private Func<string, Task<IEnumerable<string>>> GetSourceFileNames { get; set; }
         private Func<string, Task<Stream>> GetSourceFileStream { get; set; }
@@ -52,11 +52,11 @@ namespace SharePointOnlineInterface
             this.credentials = new SharePointOnlineCredentials(username, pass); //Create credentials to be used
         }
         #region MethodsNeededToUseThisAsADestination
-        public void InjectDependencies(Func<string, int, IDictionary<string, string>> GetSourceItemAttributes, Func<string, int, Task<IDictionary<string, Stream>>> GetSourceItemAttachments, Func<string, Task<IEnumerable<string>>> GetSourceFolderNames, Func<string, Task<IEnumerable<string>>> GetSourceFileNames, Func<string, Task<Stream>> GetSourceFileStream)
+        public void InjectDependencies(Func<string, int, IDictionary<string, string>> GetSourceItemAttributes, Func<string, int, Task<IEnumerable<string>>> GetSourceItemAttachmentPaths, Func<string, Task<IEnumerable<string>>> GetSourceFolderNames, Func<string, Task<IEnumerable<string>>> GetSourceFileNames, Func<string, Task<Stream>> GetSourceFileStream)
         {
             //Save the injected methods as private ones to be used later
             this.GetSourceItemAttributes = GetSourceItemAttributes;
-            this.GetSourceItemAttachments = GetSourceItemAttachments;
+            this.GetSourceItemAttachmentPaths = GetSourceItemAttachmentPaths;
             this.GetSourceFolderNames = GetSourceFolderNames;
             this.GetSourceFileNames = GetSourceFileNames;
             this.GetSourceFileStream = GetSourceFileStream;
@@ -144,7 +144,6 @@ namespace SharePointOnlineInterface
         private async Task DeleteList(List list)
         { //This is used to delete large lists that can not be deleted otherwise. It removes the items in chunks before attempting to remote the list
             ListItemCollection items;
-            int itemIndex;
             do
             {
                 items = list.GetItems(getItemsToDelete); //Get the next batch of items
@@ -180,7 +179,7 @@ namespace SharePointOnlineInterface
 
             ListItem item;
             IDictionary<string, string> attributes;
-            IDictionary<string, Stream> attachments;
+            IEnumerable<string> attachmentPaths;
             int itemIndex;
             int currentCount = await GetLastItemId(list);
 
@@ -203,19 +202,20 @@ namespace SharePointOnlineInterface
                     item.Update(); //Trigger an item update so it gets inserted
 
                     //Update attachments
-                    attachments = await GetSourceItemAttachments(list.Title, itemIndex);
-                    foreach(var attachment in attachments)
+                    attachmentPaths = await GetSourceItemAttachmentPaths(list.Title, itemIndex);
+                    foreach(var path in attachmentPaths)
                     {
-                        item.AttachmentFiles.Add(new AttachmentCreationInformation() //Queue a query to write the stream as an attachment
+                        using (var attachmentStream = await GetSourceFileStream(path))
                         {
-                            FileName = attachment.Key, //Set attachment name
-                            ContentStream = attachment.Value //Set attachment content
-                        });
+                            item.AttachmentFiles.Add(new AttachmentCreationInformation() //Queue a query to write the stream as an attachment
+                            {
+                                FileName = Path.GetFileName(path), //Set attachment name
+                                ContentStream = attachmentStream //Set attachment content
+                            });
+                            item.Update(); //Trigger an item update so attachments get inserted
+                            await list.Context.ExecuteQueryAsync(); //execute queued queries
+                        }
                     }
-
-                    item.Update(); //Trigger an item update so attachments get inserted
-                    await list.Context.ExecuteQueryAsync(); //execute queued queries
-                    attachments.Select(x => { x.Value.Dispose(); return x; }); //Dispose sreams
                 }
                 catch (Exception ex)
                 {
