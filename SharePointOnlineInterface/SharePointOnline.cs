@@ -11,6 +11,7 @@ namespace SharePointOnlineInterface
 {
     public class SharePointOnline : IDestination
     {
+        private object streamLock { get; } = new object();
         #region Properties
         private CamlQuery getItemsToDelete { get; } = new CamlQuery()
         {
@@ -29,7 +30,7 @@ namespace SharePointOnlineInterface
         private Func<string, int, Task<IEnumerable<string>>> GetSourceItemAttachmentPaths { get; set; }
         private Func<string, Task<IEnumerable<string>>> GetSourceFolderNames { get; set; }
         private Func<string, Task<IEnumerable<string>>> GetSourceFileNames { get; set; }
-        private Func<string, Task<Stream>> GetSourceFileStream { get; set; }
+        private Func<string, Stream> GetSourceFileStream { get; set; }
         #endregion
         #endregion
         #region Public
@@ -52,7 +53,7 @@ namespace SharePointOnlineInterface
             this.credentials = new SharePointOnlineCredentials(username, pass); //Create credentials to be used
         }
         #region MethodsNeededToUseThisAsADestination
-        public void InjectDependencies(Func<string, int, IDictionary<string, string>> GetSourceItemAttributes, Func<string, int, Task<IEnumerable<string>>> GetSourceItemAttachmentPaths, Func<string, Task<IEnumerable<string>>> GetSourceFolderNames, Func<string, Task<IEnumerable<string>>> GetSourceFileNames, Func<string, Task<Stream>> GetSourceFileStream)
+        public void InjectDependencies(Func<string, int, IDictionary<string, string>> GetSourceItemAttributes, Func<string, int, Task<IEnumerable<string>>> GetSourceItemAttachmentPaths, Func<string, Task<IEnumerable<string>>> GetSourceFolderNames, Func<string, Task<IEnumerable<string>>> GetSourceFileNames, Func<string, Stream> GetSourceFileStream)
         {
             //Save the injected methods as private ones to be used later
             this.GetSourceItemAttributes = GetSourceItemAttributes;
@@ -205,16 +206,20 @@ namespace SharePointOnlineInterface
                     attachmentPaths = await GetSourceItemAttachmentPaths(list.Title, itemIndex);
                     foreach(var path in attachmentPaths)
                     {
-                        using (var attachmentStream = await GetSourceFileStream(path))
+                        lock(streamLock)
                         {
-                            item.AttachmentFiles.Add(new AttachmentCreationInformation() //Queue a query to write the stream as an attachment
+                            using (var attachmentStream = GetSourceFileStream(path))
                             {
-                                FileName = Path.GetFileName(path), //Set attachment name
-                                ContentStream = attachmentStream //Set attachment content
-                            });
-                            item.Update(); //Trigger an item update so attachments get inserted
-                            await list.Context.ExecuteQueryAsync(); //execute queued queries
+                                item.AttachmentFiles.Add(new AttachmentCreationInformation() //Queue a query to write the stream as an attachment
+                                {
+                                    FileName = Path.GetFileName(path), //Set attachment name
+                                    ContentStream = attachmentStream //Set attachment content
+                                });
+                                item.Update(); //Trigger an item update so attachments get inserted
+                                list.Context.ExecuteQuery(); //execute queued queries
+                            }
                         }
+                        
                     }
                 }
                 catch (Exception ex)
@@ -245,7 +250,6 @@ namespace SharePointOnlineInterface
         {
             ClientContext c;
             Folder folder;
-            Stream fileStream;
             string sourceFileRelativeUrl;
             IEnumerable<string> folderNames = await GetSourceFolderNames(url);
             IEnumerable<string> fileNames = await GetSourceFileNames(url);
@@ -261,16 +265,19 @@ namespace SharePointOnlineInterface
                     {
                         sourceFileRelativeUrl = Path.Combine(url, fileName);
 
-                        using (fileStream = await GetSourceFileStream(sourceFileRelativeUrl))
+                        lock(streamLock)
                         {
-                            //Add file
-                            folder.Files.Add(new FileCreationInformation()
+                            using (var fileStream = GetSourceFileStream(sourceFileRelativeUrl))
                             {
-                                Url = fileName, //Set filename
-                                ContentStream = fileStream, //Get and set file stream
-                                Overwrite = false //Do not overwrite files to save time
-                            });
-                            await c.ExecuteQueryAsync();
+                                //Add file
+                                folder.Files.Add(new FileCreationInformation()
+                                {
+                                    Url = fileName, //Set filename
+                                    ContentStream = fileStream, //Get and set file stream
+                                    Overwrite = false //Do not overwrite files to save time
+                                });
+                                c.ExecuteQuery();
+                            }
                         }
                     }
                 }

@@ -7,7 +7,7 @@ namespace Interfaces
 {
     public interface IDestination
     {
-        void InjectDependencies(Func<string, int, IDictionary<string, string>> GetSourceItemAttributes, Func<string, int, Task<IEnumerable<string>>> GetSourceItemAttachmentPaths, Func<string, Task<IEnumerable<string>>> GetSourceFolderNames, Func<string, Task<IEnumerable<string>>> GetSourceFileNames, Func<string, Task<Stream>> GetSourceFileStream);
+        void InjectDependencies(Func<string, int, IDictionary<string, string>> GetSourceItemAttributes, Func<string, int, Task<IEnumerable<string>>> GetSourceItemAttachmentPaths, Func<string, Task<IEnumerable<string>>> GetSourceFolderNames, Func<string, Task<IEnumerable<string>>> GetSourceFileNames, Func<string, Stream> GetSourceFileStream);
         Task AddList(string title, int type, int itemCount);
     }
 }

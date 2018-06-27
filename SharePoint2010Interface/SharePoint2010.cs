@@ -61,9 +61,9 @@ namespace SharePoint2010Interface
         { //Returns file names under a given URL
             return PrivateGetFileNames(CleanUrl(url));
         }
-        public async Task<Stream> GetFileStream(string url)
+        public Stream GetFileStream(string url)
         { //Returns a filestream of a given file URL
-            return await PrivateGetFileStream(CleanUrl(url));
+            return PrivateGetFileStream(CleanUrl(url)).Result;
         }
         public async Task<IEnumerable<string>> GetItemAttachmentPaths(string listTitle, int itemId)
         { //Returns a dictionary of list item attachments
@@ -140,7 +140,6 @@ namespace SharePoint2010Interface
         { //Returns a list of files under passed URL
             ClientContext c;
             Folder folder;
-            IDictionary<string, Stream> output = new Dictionary<string, Stream>();
             using (c = context)
             {
                 try
