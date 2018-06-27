@@ -11,8 +11,8 @@ namespace SharePointOnlineInterface
 {
     public class SharePointOnline : IDestination
     {
-        private object streamLock { get; } = new object();
         #region Properties
+        private object StreamLock { get; } = new object();
         private CamlQuery getItemsToDelete { get; } = new CamlQuery()
         {
             ViewXml = "<View><RowLimit>1000</RowLimit></View>"
@@ -36,7 +36,7 @@ namespace SharePointOnlineInterface
         #region Public
         public SharePointOnline(string url, string username, string password)
         {
-            if(username == null || password == null) //username and passwords are required for this class
+            if (username == null || password == null) //username and passwords are required for this class
             {
                 throw new ArgumentException(message: "Arguments 'username' and 'password' are required for SharePoint Online URLs");
             }
@@ -45,11 +45,11 @@ namespace SharePointOnlineInterface
 
             //Convert the password into a secure string
             SecureString pass = new SecureString();
-            foreach(var character in password)
+            foreach (var character in password)
             {
                 pass.AppendChar(character);
             }
-            
+
             this.credentials = new SharePointOnlineCredentials(username, pass); //Create credentials to be used
         }
         #region MethodsNeededToUseThisAsADestination
@@ -151,7 +151,7 @@ namespace SharePointOnlineInterface
                 list.Context.Load(items, x => x.ListItemCollectionPosition); //Used to determine if it has all of the items or not
                 list.Context.Load(items, x => x.Include(y => y.Id)); //Get the list Ids
                 await list.Context.ExecuteQueryAsync();
-                foreach(var item in items) //Iterate the items
+                foreach (var item in items) //Iterate the items
                 {
                     item.DeleteObject(); //Deleat items one at a time
                 }
@@ -195,7 +195,7 @@ namespace SharePointOnlineInterface
 
                     //Update properties
                     attributes = GetSourceItemAttributes(list.Title, itemIndex); //Get properties from source
-                    foreach(var attribute in itemAttributes)
+                    foreach (var attribute in itemAttributes)
                     {
                         item[attribute] = attributes[attribute];
                     }
@@ -204,9 +204,9 @@ namespace SharePointOnlineInterface
 
                     //Update attachments
                     attachmentPaths = await GetSourceItemAttachmentPaths(list.Title, itemIndex);
-                    foreach(var path in attachmentPaths)
+                    foreach (var path in attachmentPaths)
                     {
-                        lock(streamLock)
+                        lock (StreamLock)
                         {
                             using (var attachmentStream = GetSourceFileStream(path))
                             {
@@ -219,7 +219,7 @@ namespace SharePointOnlineInterface
                                 list.Context.ExecuteQuery(); //execute queued queries
                             }
                         }
-                        
+
                     }
                 }
                 catch (Exception ex)
@@ -259,13 +259,13 @@ namespace SharePointOnlineInterface
                 c.Load(folder, x => x.Files.Include(y => y.Name), x => x.Folders.Include(y => y.Name)); //Get folder and file names to avoid inserting duplicates
                 await c.ExecuteQueryAsync();
                 //Iterate the files
-                foreach(var fileName in fileNames)
+                foreach (var fileName in fileNames)
                 {
                     if (!folder.Files.Any(x => x.Name == fileName)) //Make sure the file doesn't exist already
                     {
                         sourceFileRelativeUrl = Path.Combine(url, fileName);
 
-                        lock(streamLock)
+                        lock (StreamLock)
                         {
                             using (var fileStream = GetSourceFileStream(sourceFileRelativeUrl))
                             {
@@ -282,9 +282,9 @@ namespace SharePointOnlineInterface
                     }
                 }
                 //Iterate the folders
-                foreach(var folderName in folderNames)
+                foreach (var folderName in folderNames)
                 {
-                    if(!folder.Folders.Any(x => x.Name == folderName))
+                    if (!folder.Folders.Any(x => x.Name == folderName))
                     {
                         folder.AddSubFolder(folderName); //Add folder
                         await c.ExecuteQueryAsync();

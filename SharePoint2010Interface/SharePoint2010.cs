@@ -24,7 +24,7 @@ namespace SharePoint2010Interface
         public SharePoint2010(string url, string username, string password)
         {
             this.url = url;
-            if(username == null || password == null)
+            if (username == null || password == null)
             { //Use default credentials if none was specified
                 this.credentials = CredentialCache.DefaultCredentials;
             }
@@ -46,7 +46,7 @@ namespace SharePoint2010Interface
             if (item != default(ListItem))
             {
                 //Format properties to return
-                foreach(var attributeName in itemAttributes)
+                foreach (var attributeName in itemAttributes)
                 {
                     output.Add(attributeName, item[attributeName].ToString());
                 }
@@ -62,8 +62,8 @@ namespace SharePoint2010Interface
             return PrivateGetFileNames(CleanUrl(url));
         }
         public Stream GetFileStream(string url)
-        { //Returns a filestream of a given file URL
-            return PrivateGetFileStream(CleanUrl(url)).Result;
+        { //Returns a filestream of a given file URL. KEEP THIS SYNCHRONOUS
+            return PrivateGetFileStream(CleanUrl(url));
         }
         public async Task<IEnumerable<string>> GetItemAttachmentPaths(string listTitle, int itemId)
         { //Returns a dictionary of list item attachments
@@ -159,7 +159,7 @@ namespace SharePoint2010Interface
             }
             return new List<string>();
         }
-        private async Task<Stream> PrivateGetFileStream(string url)
+        private Stream PrivateGetFileStream(string url)
         { //Returns a stream of the passed in file url
             ClientContext c;
             FileInformation file;
@@ -169,7 +169,7 @@ namespace SharePoint2010Interface
                 try
                 {
                     file = Microsoft.SharePoint.Client.File.OpenBinaryDirect(c, url); //Gets the file
-                    await file.Stream.CopyToAsync(output); //Copies the file to a memory stream
+                    file.Stream.CopyTo(output); //Copies the file to a memory stream
                     output.Seek(0, SeekOrigin.Begin); //Resets the stream so it is ready to be used
                 }
                 catch (Exception ex)
