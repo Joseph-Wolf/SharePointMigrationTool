@@ -5,7 +5,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net;
-using System.Threading.Tasks;
 
 namespace SharePoint2010Interface
 {
@@ -53,11 +52,11 @@ namespace SharePoint2010Interface
             }
             return output; //return any found properties
         }
-        public async Task<IEnumerable<string>> GetFolderNames(string url)
+        public IEnumerable<string> GetFolderNames(string url)
         { //Returns subfolder names of a given URL
             return PrivateGetFolderNames(CleanUrl(url));
         }
-        public async Task<IEnumerable<string>> GetFileNames(string url)
+        public IEnumerable<string> GetFileNames(string url)
         { //Returns file names under a given URL
             return PrivateGetFileNames(CleanUrl(url));
         }
@@ -65,7 +64,7 @@ namespace SharePoint2010Interface
         { //Returns a filestream of a given file URL. KEEP THIS SYNCHRONOUS
             return PrivateGetFileStream(CleanUrl(url));
         }
-        public async Task<IEnumerable<string>> GetItemAttachmentPaths(string listTitle, int itemId)
+        public IEnumerable<string> GetItemAttachmentPaths(string listTitle, int itemId)
         { //Returns a dictionary of list item attachments
             ListItem item = GetItem(listTitle, itemId); //Get the item
             if (item["Attachments"] as bool? == true) //Make sure the item has attachments

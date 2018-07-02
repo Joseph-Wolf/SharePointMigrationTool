@@ -20,7 +20,6 @@ namespace MigrateToO365Async
             string destinationPassword = null;
             string key;
             string value;
-            List<Task> tasks = new List<Task>();
             ISource source;
             IDestination destination;
             IEnumerable<SourceList> sourceLists;
@@ -99,14 +98,11 @@ namespace MigrateToO365Async
             //Get lists present in the source
             sourceLists = source.GetLists();
             //Iterate and add lists
-            sourceLists = sourceLists.Where(x => x.Title == "ActivityAttachment"); //Debugging
+            //sourceLists = sourceLists.Where(x => x.Title == "ActivityAttachment"); //Debugging
             foreach (var list in sourceLists)
             {
-                tasks.Add(destination.AddList(list.Title, list.Type, list.ItemCount));
+                destination.AddList(list.Title, list.Type, list.ItemCount);
             }
-            //Wait for all of the tasks to complete
-            Task.WaitAll(tasks.ToArray());
-            tasks.Clear();
         }
     }
 }
