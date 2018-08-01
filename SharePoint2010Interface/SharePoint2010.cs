@@ -47,7 +47,10 @@ namespace SharePoint2010Interface
                 //Format properties to return
                 foreach (var attributeName in itemAttributes)
                 {
-                    output.Add(attributeName, item[attributeName].ToString());
+                    if (item.FieldValues.ContainsKey(attributeName))
+                    {
+                        output.Add(attributeName, item[attributeName].ToString());
+                    }
                 }
             }
             return output; //return any found properties
@@ -67,7 +70,7 @@ namespace SharePoint2010Interface
         public IEnumerable<string> GetItemAttachmentPaths(string listTitle, int itemId)
         { //Returns a dictionary of list item attachments
             ListItem item = GetItem(listTitle, itemId); //Get the item
-            if (item["Attachments"] as bool? == true) //Make sure the item has attachments
+            if (item.FieldValues.ContainsKey("Attachments") && item["Attachments"] as bool? == true) //Make sure the item has attachments
             {
                 FileCollection attachmentCollection = GetAttachmentCollection(listTitle, itemId); //Get the collection of attachments
                 return attachmentCollection.Select(x => UncleanUrl(x.ServerRelativeUrl));
@@ -232,18 +235,26 @@ namespace SharePoint2010Interface
             {
                 c.Load(c.Web, x => x.Lists.Include(y => y.Title, y => y.BaseTemplate)); //Gets the base fields
                 c.ExecuteQuery();
-                return c.Web.Lists.Select(x => new SourceList() { Title = x.Title, Type = x.BaseTemplate, ItemCount = GetLastItemId(x) }); //Returns formatted lists
+                return c.Web.Lists.Select(x => new SourceList() { Title = x.Title, Type = x.BaseTemplate }); //Returns formatted lists
             }
         }
-        private int GetLastItemId(List list)
+        public int GetLastItemId(string title)
         { //This is used to get the last item id from a list
             ListItemCollection items;
-            items = list.GetItems(getLastItemIdQuery); //Get the last Item added
-            list.Context.Load(items, x => x.Include(y => y.Id)); //Queue a query to get the last Item Id
-            list.Context.ExecuteQuery(); //Execute query to get the last item Id
-            if (items.Any())
+            using(var c = context)
             {
-                return items.First().Id; //return the id
+                c.Load(c.Web, x => x.Lists.Where(y => y.Title == title));
+                c.ExecuteQuery();
+                if (c.Web.Lists.Any())
+                {
+                    items = c.Web.Lists.First().GetItems(getLastItemIdQuery);
+                    c.Load(items, x => x.Include(y => y.Id)); //Queue a query to get the last Item Id
+                    c.ExecuteQuery(); //Execute query to get the last item Id
+                    if (items.Any())
+                    {
+                        return items.First().Id; //return the id
+                    }
+                }
             }
             return 0; //return 0 because there are no items
         }

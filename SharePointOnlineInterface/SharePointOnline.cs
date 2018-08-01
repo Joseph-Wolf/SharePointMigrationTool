@@ -11,6 +11,7 @@ namespace SharePointOnlineInterface
     public class SharePointOnline : IDestination
     {
         #region Properties
+        private ISource source { get; set; }
         private CamlQuery getItemsToDelete { get; } = new CamlQuery()
         {
             ViewXml = "<View><RowLimit>1000</RowLimit></View>"
@@ -20,17 +21,11 @@ namespace SharePointOnlineInterface
             ViewXml = "<View><Query><OrderBy><FieldRef Name='ID' Ascending='FALSE'/></OrderBy></Query><RowLimit>1</RowLimit></View>"
         };
         private string getItemByIdCamlView { get; } = "<View><Query><Where><Eq><FieldRef Name='ID' /><Value Type='Number'>{0}</Value></Eq></Where></Query><RowLimit>1</RowLimit></View>";
-        private int MaxInsertCount { get; } = 10;
         private string[] itemAttributes { get; } = new string[] { "Title", "Modified", "Created" };
         private SharePointOnlineCredentials credentials { get; set; }
         private string url { get; set; }
-        #region Dependencies
-        private Func<string, int, IDictionary<string, string>> GetSourceItemAttributes { get; set; }
-        private Func<string, int, IEnumerable<string>> GetSourceItemAttachmentPaths { get; set; }
-        private Func<string, IEnumerable<string>> GetSourceFolderNames { get; set; }
-        private Func<string, IEnumerable<string>> GetSourceFileNames { get; set; }
-        private Func<string, Stream> GetSourceFileStream { get; set; }
-        #endregion
+        private IDictionary<string, int> sourceLastItemId { get; set; } = new Dictionary<string, int>();
+        private IDictionary<string, int> destinationLastItemId { get; set; } = new Dictionary<string, int>();
         #endregion
         #region Public
         public SharePointOnline(string url, string username, string password)
@@ -52,16 +47,11 @@ namespace SharePointOnlineInterface
             this.credentials = new SharePointOnlineCredentials(username, pass); //Create credentials to be used
         }
         #region MethodsNeededToUseThisAsADestination
-        public void InjectDependencies(Func<string, int, IDictionary<string, string>> GetSourceItemAttributes, Func<string, int, IEnumerable<string>> GetSourceItemAttachmentPaths, Func<string, IEnumerable<string>> GetSourceFolderNames, Func<string, IEnumerable<string>> GetSourceFileNames, Func<string, Stream> GetSourceFileStream)
+        public void InjectDependencies(ISource _source)
         {
-            //Save the injected methods as private ones to be used later
-            this.GetSourceItemAttributes = GetSourceItemAttributes;
-            this.GetSourceItemAttachmentPaths = GetSourceItemAttachmentPaths;
-            this.GetSourceFolderNames = GetSourceFolderNames;
-            this.GetSourceFileNames = GetSourceFileNames;
-            this.GetSourceFileStream = GetSourceFileStream;
+            this.source = _source;
         }
-        public void AddList(string title, int type, int count)
+        public void AddList(string title, int type)
         {
             List list = GetOrCreateList(title, type); //Returns the expected list
 
@@ -73,7 +63,7 @@ namespace SharePointOnlineInterface
 #if DEBUG
                         Console.WriteLine(string.Format("InitGenericList:'{0}'", title));
 #endif
-                        InitGenericList(title, count);
+                        InitGenericList(title);
                         break;
                     case ListTemplateType.DocumentLibrary:
 #if DEBUG
@@ -183,12 +173,12 @@ namespace SharePointOnlineInterface
             return 0; //return 0 because there are no items
         }
         #region GenericList
-        private void InitGenericList(string title, int count)
+        private void InitGenericList(string title)
         { //Used to populate Generic lists
             var moreRecords = true;
             do
             {
-                moreRecords = AddListItem(title, count);
+                moreRecords = AddListItem(title);
             }
             while (moreRecords == true);
         }
@@ -210,10 +200,10 @@ namespace SharePointOnlineInterface
                     if (items.Any())
                     {
                         var item = items.First();
-                        var attachmentPaths = GetSourceItemAttachmentPaths(title, id);
+                        var attachmentPaths = source.GetItemAttachmentPaths(title, id);
                         foreach (var path in attachmentPaths)
                         {
-                            using(var stream = GetSourceFileStream(path))
+                            using(var stream = source.GetFileStream(path))
                             {
                                 item.AttachmentFiles.Add(new AttachmentCreationInformation() //Queue a query to write the stream as an attachment
                                 {
@@ -245,10 +235,13 @@ namespace SharePointOnlineInterface
                     if (items.Any())
                     {
                         var item = items.First();
-                        var attributes = GetSourceItemAttributes(title, id); //Get properties from source
+                        var attributes = source.GetItemAttributes(title, id); //Get properties from source
                         foreach (var attribute in itemAttributes)
                         {
-                            item[attribute] = attributes[attribute];
+                            if (attributes.ContainsKey(attribute))
+                            {
+                                item[attribute] = attributes[attribute];
+                            }
                         }
 
                         item.Update(); //Trigger an item update so it gets inserted
@@ -258,9 +251,29 @@ namespace SharePointOnlineInterface
             }
             UpdateAttachments(title, id);
         }
-        private bool AddListItem(string title, int count)
+        private bool AddListItem(string title)
         {
             var itemId = -1;
+            //Load the initial last item ids for validation checks
+            if (!sourceLastItemId.ContainsKey(title))
+            {
+                sourceLastItemId[title] = source.GetLastItemId(title);
+            }
+            if (!destinationLastItemId.ContainsKey(title))
+            {
+                destinationLastItemId[title] = GetLastItemId(title);
+            }
+
+            if (sourceLastItemId[title] <= destinationLastItemId[title]) //make sure this list still needs items
+            {
+                var sourceLastId = sourceLastItemId[title];
+                sourceLastItemId[title] = source.GetLastItemId(title); //Check again to see if any new items have been added to the source
+                if (sourceLastId == sourceLastItemId[title]) //If no new items have been added then return
+                {
+                    return false;
+                }
+            }
+            //Begin the insert
             using (var c = context)
             {
                 c.Load(c.Web, x => x.Lists.Where(y => y.Title == title));
@@ -275,15 +288,17 @@ namespace SharePointOnlineInterface
                     itemId = item.Id;
                 }
             }
-            if(itemId > -1)
+            if(itemId > -1) //make sure item was returned
             {
+                Console.WriteLine(string.Format("Created item Id:{0}", itemId));
+                destinationLastItemId[title] = itemId; //Update the last destination item id
                 UpdateItemProperties(title, itemId);
-                return itemId >= count ? false : true; //Set boolean to indicate if there are more records to process
+                return true; //Set boolean to indicate if there are more records to process
             }
             return false;
         }
-        #endregion
-        #region DocumentLibrary
+#endregion
+#region DocumentLibrary
         private void InitDocumentLibrary(string listTitle)
         { //Used to populate Document libraries
             using(var c = context)
@@ -308,8 +323,8 @@ namespace SharePointOnlineInterface
         }
         private void PopulateFolder(string url)
         {
-            var folderNames = GetSourceFolderNames(url);
-            var fileNames = GetSourceFileNames(url);
+            var folderNames = source.GetFolderNames(url);
+            var fileNames = source.GetFileNames(url);
             using (var c = context)
             {
                 var folder = c.Web.GetFolderByServerRelativeUrl(CleanUrl(url)); //Get the folder
@@ -322,7 +337,7 @@ namespace SharePointOnlineInterface
                     {
                         var sourceFileRelativeUrl = Path.Combine(url, fileName);
 
-                        using (var fileStream = GetSourceFileStream(sourceFileRelativeUrl))
+                        using (var fileStream = source.GetFileStream(sourceFileRelativeUrl))
                         {
                             //Add file
                             folder.Files.Add(new FileCreationInformation()
@@ -347,7 +362,7 @@ namespace SharePointOnlineInterface
                 }
             }
         }
-        #endregion
-        #endregion
+#endregion
+#endregion
     }
 }

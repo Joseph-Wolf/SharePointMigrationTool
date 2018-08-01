@@ -4,7 +4,6 @@ using SharePointOnlineInterface;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading.Tasks;
 
 namespace MigrateToO365Async
 {
@@ -94,14 +93,13 @@ namespace MigrateToO365Async
                 return;
             }
             //Inject required methods from the source to the destination class
-            destination.InjectDependencies(source.GetItemAttributes, source.GetItemAttachmentPaths, source.GetFolderNames, source.GetFileNames, source.GetFileStream);
+            destination.InjectDependencies(source);
             //Get lists present in the source
             sourceLists = source.GetLists();
             //Iterate and add lists
-            //sourceLists = sourceLists.Where(x => x.Title == "ActivityAttachment"); //Debugging
             foreach (var list in sourceLists)
             {
-                destination.AddList(list.Title, list.Type, list.ItemCount);
+                destination.AddList(list.Title, list.Type);
             }
         }
     }
