@@ -17,6 +17,8 @@ namespace MigrateToO365Async
             string destinationUrl = null;
             string destinationUsername = null;
             string destinationPassword = null;
+            int startIndex = -1;
+            int endIndex = -1;
             string key;
             string value;
             ISource source;
@@ -50,6 +52,12 @@ namespace MigrateToO365Async
                             break;
                         case "DESTINATIONPASSWORD":
                             destinationPassword = value;
+                            break;
+                        case "STARTINDEX":
+                            startIndex = Int32.Parse(value);
+                            break;
+                        case "ENDINDEX":
+                            endIndex = Int32.Parse(value);
                             break;
                         default:
                             break;
@@ -85,7 +93,7 @@ namespace MigrateToO365Async
             {
                 //TODO: Determine which SharePoint class source/destination should be used automatically
                 source = new SharePoint2010(sourceUrl, sourceUsername, sourcePassword);
-                destination = new SharePointOnline(destinationUrl, destinationUsername, destinationPassword);
+                destination = new SharePointOnline(destinationUrl, destinationUsername, destinationPassword, startIndex, endIndex);
             }
             catch (ArgumentException ex) //Catch exceptions thrown by invalid arguments (if username/password is required)
             {
@@ -95,7 +103,7 @@ namespace MigrateToO365Async
             //Inject required methods from the source to the destination class
             destination.InjectDependencies(source);
             //Get lists present in the source
-            sourceLists = source.GetLists();
+            sourceLists = source.GetLists().Where(x => x.Title == "ActivityAttachment");
             //Iterate and add lists
             foreach (var list in sourceLists)
             {
